@@ -5,610 +5,321 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lista Enorme</title>
     
-    <!-- Favicon Emoji -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>">
-
-    <!-- Tailwind CSS -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slide-down { animation: slideDown 0.2s ease-out forwards; }
-        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         img[src=""] { display: none; }
         input, select, textarea { font-size: 16px !important; }
+        #loading-overlay.active { display: flex; }
     </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24 md:pb-0">
 
-    <!-- Toast Container -->
-    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[90] pointer-events-none w-[90%] max-w-sm flex flex-col items-center gap-2"></div>
+    <!-- Loading -->
+    <div id="loading-overlay" class="fixed inset-0 z-[100] bg-white/90 backdrop-blur-sm hidden items-center justify-center flex-col gap-4">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+        <p id="loading-text" class="text-sm font-medium text-slate-500">Carregando...</p>
+    </div>
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Toast -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[110] pointer-events-none w-[90%] max-w-sm flex flex-col items-center gap-2"></div>
+
+    <!-- Modal LOGIN (Auth) -->
+    <div id="modal-auth" class="fixed inset-0 z-[200] bg-slate-900 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-fade-in">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
+                    <i data-lucide="lock" class="text-indigo-600 w-8 h-8"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900">Acesso Restrito</h2>
+                <p class="text-slate-500 text-sm mt-2">Insira as credenciais do seu banco de dados Supabase para conectar.</p>
+            </div>
             
-            <!-- [ROW 1] Topo: Logo + Ações Principais (Desktop) + Hamburger (Mobile) -->
-            <div class="flex items-center justify-between py-3 md:py-4">
-                
-                <!-- Logo -->
-                <div class="flex items-center gap-2 md:gap-3">
-                    <div class="bg-indigo-600 p-1.5 md:p-2 rounded-lg">
-                        <i data-lucide="file-text" class="text-white w-5 h-5 md:w-6 md:h-6"></i>
-                    </div>
-                    <div class="flex flex-col">
-                        <h1 class="text-lg md:text-2xl font-bold text-slate-900 tracking-tight leading-none">Lista Enorme</h1>
-                        <span id="item-count-badge" class="text-slate-500 text-[10px] md:text-xs font-medium mt-0.5">
-                            0 itens
-                        </span>
-                    </div>
+            <form onsubmit="App.handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Project URL</label>
+                    <input type="text" id="auth-url" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="https://xyz.supabase.co">
                 </div>
-
-                <!-- Desktop Actions (Hidden on Mobile) -->
-                <div class="hidden md:flex items-center gap-3">
-                    <!-- View Toggle Desktop -->
-                    <div class="flex items-center bg-slate-100 rounded-lg p-1 mr-2">
-                        <button onclick="App.setViewMode('list')" id="btn-view-list-d" class="p-2 rounded-md transition-all text-slate-500 hover:text-slate-700" title="Lista">
-                            <i data-lucide="list" size="18"></i>
-                        </button>
-                        <button onclick="App.setViewMode('grid')" id="btn-view-grid-d" class="p-2 rounded-md transition-all text-slate-500 hover:text-slate-700" title="Vitrine">
-                            <i data-lucide="grid" size="18"></i>
-                        </button>
-                        <div class="w-px h-4 bg-slate-300 mx-1"></div>
-                        <button onclick="App.setViewMode('trash')" id="btn-view-trash-d" class="p-2 rounded-md transition-all flex items-center gap-2 text-slate-500 hover:text-red-600" title="Lixeira">
-                            <i data-lucide="trash-2" size="18"></i>
-                            <span id="trash-count-badge-d" class="text-xs font-bold hidden">0</span>
-                        </button>
-                    </div>
-
-                    <!-- Main Buttons Desktop -->
-                    <button onclick="App.prepareCreate()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">
-                        <i data-lucide="plus" size="16"></i> Novo
-                    </button>
-                    <button onclick="App.openModal('batch')" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">
-                        Batch
-                    </button>
-                    
-                    <!-- Extras Desktop -->
-                    <div class="flex items-center gap-1 border-l border-slate-200 pl-3">
-                        <button onclick="App.pickRandomItem()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Sorteio"><i data-lucide="dices" size="18"></i></button>
-                        <button onclick="App.openMassTagModal()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Tags em Massa"><i data-lucide="tags" size="18"></i></button>
-                        <button onclick="App.exportData()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Exportar"><i data-lucide="download" size="18"></i></button>
-                        <button onclick="document.getElementById('file-input').click()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Importar"><i data-lucide="upload" size="18"></i></button>
-                    </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Anon / Public Key</label>
+                    <input type="password" id="auth-key" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="eyJh...">
                 </div>
-
-                <!-- Mobile Hamburger (Visible only on Mobile) -->
-                <button onclick="App.toggleMobileMenu()" class="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-                    <i data-lucide="menu" size="24"></i>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg mt-2">
+                    Conectar
                 </button>
-            </div>
-
-            <!-- Mobile Menu Dropdown -->
-            <div id="mobile-menu" class="hidden md:hidden border-t border-slate-100 py-2 animate-slide-down">
-                <div class="grid grid-cols-3 gap-2 p-2">
-                    <button onclick="App.prepareCreate(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-indigo-50 text-indigo-700 rounded-xl">
-                        <i data-lucide="plus" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Novo</span>
-                    </button>
-                    <button onclick="App.openModal('batch'); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-slate-100 text-slate-700 rounded-xl">
-                        <i data-lucide="layers" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Batch</span>
-                    </button>
-                    <button onclick="App.pickRandomItem(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-amber-50 text-amber-700 rounded-xl">
-                        <i data-lucide="dices" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Sortear</span>
-                    </button>
-                    <button onclick="App.openMassTagModal(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-slate-50 text-slate-600 rounded-xl">
-                        <i data-lucide="tags" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Tags</span>
-                    </button>
-                    <button onclick="App.exportData(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-slate-50 text-slate-600 rounded-xl">
-                        <i data-lucide="download" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Salvar</span>
-                    </button>
-                    <button onclick="document.getElementById('file-input').click(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-3 bg-slate-50 text-slate-600 rounded-xl">
-                        <i data-lucide="upload" size="20" class="mb-1"></i>
-                        <span class="text-xs font-medium">Abrir</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- [ROW 2] Controles: Busca + Filtros (Adaptável) -->
-            <div id="controls-bar" class="pb-3 md:pb-4 md:flex md:gap-3 md:items-center">
-                <!-- Busca -->
-                <div class="relative w-full md:flex-1 mb-3 md:mb-0">
-                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"></i>
-                    <input 
-                        type="text" 
-                        id="search-input"
-                        placeholder="Buscar itens..." 
-                        class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm outline-none transition-shadow"
-                        oninput="App.handleSearch(this.value)"
-                    >
-                </div>
-
-                <!-- Filtros e View Toggle (Mobile) -->
-                <div class="flex gap-2 w-full md:w-auto">
-                    <!-- View Toggle Mobile (Só aparece no mobile, no desktop está no topo) -->
-                    <div class="flex items-center bg-slate-100 rounded-xl p-1 flex-shrink-0 md:hidden">
-                        <button onclick="App.setViewMode('list')" id="btn-view-list-m" class="p-2 rounded-lg text-slate-500">
-                            <i data-lucide="list" size="18"></i>
-                        </button>
-                        <button onclick="App.setViewMode('grid')" id="btn-view-grid-m" class="p-2 rounded-lg text-slate-500">
-                            <i data-lucide="grid" size="18"></i>
-                        </button>
-                        <div class="w-px h-4 bg-slate-300 mx-1"></div>
-                        <button onclick="App.setViewMode('trash')" id="btn-view-trash-m" class="p-2 rounded-lg text-slate-500 hover:text-red-600 relative">
-                            <i data-lucide="trash-2" size="18"></i>
-                            <div id="trash-dot-m" class="hidden absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
-                        </button>
-                    </div>
-
-                    <!-- Selects -->
-                    <select id="sort-select" onchange="App.handleSort(this.value)" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-[42px]">
-                        <option value="dateDesc">Recentes</option>
-                        <option value="dateAsc">Antigos</option>
-                        <option value="alpha">A - Z</option>
-                    </select>
-
-                    <select id="tag-filter" onchange="App.handleTagFilter(this.value)" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-[42px] min-w-[100px]">
-                        <option value="">Tags</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Cabeçalho Lixeira (Substitui Controles quando ativo) -->
-            <div id="trash-header" class="hidden py-3 md:py-4 border-t border-slate-100 justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="bg-red-100 p-2 rounded-lg text-red-600">
-                        <i data-lucide="trash-2" size="20"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-800">Lixeira</h2>
-                        <p class="text-xs text-slate-500">Itens removidos</p>
-                    </div>
-                </div>
-                <button onclick="App.setViewMode('list')" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm">
-                    <i data-lucide="arrow-left" size="16"></i> Voltar
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div id="items-container" class="pb-20 md:pb-0">
-            <!-- Conteúdo injetado via JS -->
-        </div>
-    </main>
-
-    <!-- Floating Action Button (FAB) para Mobile -->
-    <button onclick="App.prepareCreate()" id="fab-create" class="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-xl hover:bg-indigo-700 active:scale-95 transition-all z-50 flex items-center justify-center md:hidden">
-        <i data-lucide="plus" size="28"></i>
-    </button>
-
-    <!-- Input invisível para importação -->
-    <input type="file" id="file-input" class="hidden" accept="application/json" onchange="App.handleImport(this)">
-
-    <!-- ================= MODAIS ================= -->
-    <!-- (Mantidos idênticos ao anterior, apenas garantindo estrutura) -->
-
-    <!-- Modal Editar/Criar -->
-    <div id="modal-edit" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-fade-in mb-0 sm:mb-auto">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <h2 id="modal-edit-title" class="text-lg font-bold text-slate-800">Novo Item</h2>
-                <button onclick="App.closeModal('edit')" class="text-slate-400 hover:text-slate-600 p-2"><i data-lucide="x"></i></button>
-            </div>
-            <form id="form-edit" onsubmit="App.saveItem(event)" class="p-6 overflow-y-auto space-y-4">
-                <input type="hidden" id="edit-id">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-                    <input type="text" id="edit-name" required class="w-full px-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Chrono Trigger">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Tags (vírgula)</label>
-                    <div class="relative">
-                        <i data-lucide="tag" class="absolute left-3 top-3.5 text-slate-400 w-4 h-4"></i>
-                        <input type="text" id="edit-tags" class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="livro, rpg">
-                    </div>
-                </div>
-                
-                <!-- Links e Imagem -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">URL da Imagem</label>
-                        <div class="relative">
-                            <i data-lucide="image" class="absolute left-3 top-3.5 text-slate-400 w-4 h-4"></i>
-                            <input type="text" id="edit-image" class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." onchange="App.previewImage(this.value)">
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Link Internet (URL)</label>
-                            <div class="relative">
-                                <i data-lucide="link" class="absolute left-3 top-3.5 text-slate-400 w-4 h-4"></i>
-                                <input type="text" id="edit-link" class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="google.com">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Caminho Local</label>
-                            <div class="relative">
-                                <i data-lucide="hard-drive" class="absolute left-3 top-3.5 text-slate-400 w-4 h-4"></i>
-                                <input type="text" id="edit-local-path" class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="C:\Users\Eu\Docs...">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="image-preview-container" class="hidden h-32 w-full bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-                    <img id="image-preview" src="" class="w-full h-full object-cover">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                    <textarea id="edit-desc" class="w-full px-3 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[120px]" placeholder="Detalhes..."></textarea>
-                </div>
-                <div class="pt-2 pb-6 sm:pb-0">
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg">
-                        <i data-lucide="save" size="20"></i> Salvar Item
-                    </button>
+                <div class="pt-4 border-t border-slate-100 mt-4">
+                    <p class="text-[10px] text-slate-400 text-center">
+                        Seus dados ficam salvos apenas no seu navegador.
+                        <br>Para desconectar, clique em "Sair" no menu.
+                    </p>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal Batch Add -->
-    <div id="modal-batch" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-fade-in">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-800">Batch Add</h2>
-                    <p class="text-xs text-slate-500">Cole sua lista.</p>
-                </div>
-                <button onclick="App.closeModal('batch')" class="text-slate-400 hover:text-slate-600 p-2"><i data-lucide="x"></i></button>
-            </div>
-            <div class="p-6 flex-1 flex flex-col">
-                <textarea id="batch-text" class="w-full flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm min-h-[300px]" placeholder="20. battle royale (livro)&#10;21. chrono trigger [rpg]"></textarea>
-                <div class="mt-4 flex justify-end gap-3">
-                    <button onclick="App.closeModal('batch')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancelar</button>
-                    <button onclick="App.processBatch()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors">
-                        <i data-lucide="plus" size="18"></i> Processar
+    <!-- Interface Principal (Oculta até login) -->
+    <div id="app-interface" class="hidden">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Top Row -->
+                <div class="flex items-center justify-between py-3 md:py-4">
+                    <div class="flex items-center gap-2 md:gap-3">
+                        <div class="bg-indigo-600 p-1.5 md:p-2 rounded-lg">
+                            <i data-lucide="database" class="text-white w-5 h-5 md:w-6 md:h-6"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <h1 class="text-lg md:text-2xl font-bold text-slate-900 tracking-tight leading-none">Lista Enorme</h1>
+                            <span id="item-count-badge" class="text-slate-500 text-[10px] md:text-xs font-medium mt-0.5">Conectado</span>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Menu -->
+                    <div class="hidden md:flex items-center gap-3">
+                        <div class="flex items-center bg-slate-100 rounded-lg p-1 mr-2">
+                            <button onclick="App.setViewMode('list')" id="btn-view-list-d" class="p-2 rounded-md hover:bg-white hover:shadow-sm" title="Lista"><i data-lucide="list" size="18"></i></button>
+                            <button onclick="App.setViewMode('grid')" id="btn-view-grid-d" class="p-2 rounded-md hover:bg-white hover:shadow-sm" title="Vitrine"><i data-lucide="grid" size="18"></i></button>
+                            <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                            <button onclick="App.setViewMode('trash')" id="btn-view-trash-d" class="p-2 rounded-md hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center gap-1" title="Lixeira">
+                                <i data-lucide="trash-2" size="18"></i>
+                                <span id="trash-count-badge-d" class="text-xs font-bold hidden">0</span>
+                            </button>
+                        </div>
+                        <button onclick="App.prepareCreate()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"><i data-lucide="plus" size="16"></i> Novo</button>
+                        <button onclick="App.openModal('batch')" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">Batch</button>
+                        
+                        <div class="flex items-center gap-1 border-l border-slate-200 pl-3">
+                            <button onclick="App.pickRandomItem()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Sortear"><i data-lucide="dices" size="18"></i></button>
+                            <button onclick="App.openMassTagModal()" class="p-2 text-slate-500 hover:text-indigo-600 rounded-lg" title="Tags"><i data-lucide="tags" size="18"></i></button>
+                            <button onclick="App.migrateLocalData()" class="p-2 text-amber-500 hover:bg-amber-50 rounded-lg" title="Migrar Dados Locais (Legacy) para o Banco"><i data-lucide="database-backup" size="18"></i></button>
+                            <button onclick="App.logout()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Sair / Desconectar"><i data-lucide="log-out" size="18"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Hamburger -->
+                    <button onclick="App.toggleMobileMenu()" class="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                        <i data-lucide="menu" size="24"></i>
                     </button>
                 </div>
+
+                <!-- Mobile Dropdown -->
+                <div id="mobile-menu" class="hidden md:hidden border-t border-slate-100 py-2 animate-slide-down">
+                    <div class="grid grid-cols-4 gap-2 p-2">
+                        <button onclick="App.prepareCreate(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-2 bg-indigo-50 text-indigo-700 rounded-xl"><i data-lucide="plus" size="20"></i><span class="text-[10px]">Novo</span></button>
+                        <button onclick="App.openModal('batch'); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-2 bg-slate-100 text-slate-700 rounded-xl"><i data-lucide="layers" size="20"></i><span class="text-[10px]">Batch</span></button>
+                        <button onclick="App.pickRandomItem(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-2 bg-amber-50 text-amber-700 rounded-xl"><i data-lucide="dices" size="20"></i><span class="text-[10px]">Sorteio</span></button>
+                        <button onclick="App.openMassTagModal(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-2 bg-slate-50 text-slate-600 rounded-xl"><i data-lucide="tags" size="20"></i><span class="text-[10px]">Tags</span></button>
+                        <button onclick="App.migrateLocalData(); App.toggleMobileMenu()" class="flex flex-col items-center justify-center p-2 bg-amber-50 text-amber-600 rounded-xl"><i data-lucide="database-backup" size="20"></i><span class="text-[10px]">Migrar</span></button>
+                        <button onclick="App.logout()" class="flex flex-col items-center justify-center p-2 bg-red-50 text-red-600 rounded-xl"><i data-lucide="log-out" size="20"></i><span class="text-[10px]">Sair</span></button>
+                    </div>
+                </div>
+
+                <!-- Controls Bar -->
+                <div id="controls-bar" class="pb-3 md:pb-4 md:flex md:gap-3 md:items-center">
+                    <div class="relative w-full md:flex-1 mb-3 md:mb-0">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                        <input type="text" id="search-input" placeholder="Buscar..." class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm outline-none" oninput="App.handleSearch(this.value)">
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <div class="flex items-center bg-slate-100 rounded-xl p-1 flex-shrink-0 md:hidden">
+                            <button onclick="App.setViewMode('list')" id="btn-view-list-m" class="p-2 rounded-lg text-slate-500"><i data-lucide="list" size="18"></i></button>
+                            <button onclick="App.setViewMode('grid')" id="btn-view-grid-m" class="p-2 rounded-lg text-slate-500"><i data-lucide="grid" size="18"></i></button>
+                            <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                            <button onclick="App.setViewMode('trash')" id="btn-view-trash-m" class="p-2 rounded-lg text-slate-500 hover:text-red-600"><i data-lucide="trash-2" size="18"></i></button>
+                        </div>
+                        <select id="sort-select" onchange="App.handleSort(this.value)" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-[42px]">
+                            <option value="dateDesc">Recentes</option>
+                            <option value="dateAsc">Antigos</option>
+                            <option value="alpha">A - Z</option>
+                        </select>
+                        <select id="tag-filter" onchange="App.handleTagFilter(this.value)" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-[42px] min-w-[100px]">
+                            <option value="">Tags</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Trash Header -->
+                <div id="trash-header" class="hidden py-3 md:py-4 border-t border-slate-100 justify-between items-center">
+                    <div class="flex items-center gap-2 text-red-600 font-bold"><i data-lucide="trash-2"></i> Lixeira</div>
+                    <button onclick="App.setViewMode('list')" class="bg-slate-100 px-4 py-2 rounded-lg text-sm font-medium">Voltar</button>
+                </div>
             </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24" id="items-container"></main>
+        
+        <!-- FAB -->
+        <button onclick="App.prepareCreate()" id="fab-create" class="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-xl hover:bg-indigo-700 active:scale-95 transition-all z-50 flex items-center justify-center md:hidden"><i data-lucide="plus" size="28"></i></button>
+    </div>
+
+    <!-- Modals -->
+    <!-- Edit/Create -->
+    <div id="modal-edit" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg flex flex-col max-h-[90vh] animate-fade-in">
+            <div class="px-6 py-4 border-b flex justify-between items-center"><h2 id="modal-edit-title" class="font-bold">Item</h2><button onclick="App.closeModal('edit')" class="p-2"><i data-lucide="x"></i></button></div>
+            <form id="form-edit" onsubmit="App.saveItem(event)" class="p-6 overflow-y-auto space-y-4">
+                <input type="hidden" id="edit-id">
+                <div><label class="text-xs font-bold uppercase text-slate-500">Nome</label><input id="edit-name" required class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="text-xs font-bold uppercase text-slate-500">Tags</label><input id="edit-tags" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="tag1, tag2"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold uppercase text-slate-500">Imagem URL</label><input id="edit-image" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" onchange="App.previewImage(this.value)"></div>
+                    <div><label class="text-xs font-bold uppercase text-slate-500">Link Web</label><input id="edit-link" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                </div>
+                <div><label class="text-xs font-bold uppercase text-slate-500">Caminho Local</label><input id="edit-local-path" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div id="image-preview-container" class="hidden h-32 bg-slate-100 rounded-lg overflow-hidden"><img id="image-preview" class="w-full h-full object-cover"></div>
+                <div><label class="text-xs font-bold uppercase text-slate-500">Descrição</label><textarea id="edit-desc" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-24"></textarea></div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">Salvar</button>
+            </form>
         </div>
     </div>
 
-    <!-- Modal Mass Tag -->
-    <div id="modal-mass-tag" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full animate-fade-in">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="bg-indigo-100 p-2 rounded-full text-indigo-600">
-                    <i data-lucide="tags" size="20"></i>
-                </div>
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900">Adicionar Tag</h3>
-                    <p class="text-xs text-slate-500" id="mass-tag-count">Aplicar em 0 itens</p>
-                </div>
-            </div>
-            
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Nome da Tag</label>
-                <input type="text" id="mass-tag-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: pendente">
-            </div>
+    <!-- Batch -->
+    <div id="modal-batch" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div class="bg-white rounded-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-fade-in"><div class="px-6 py-4 border-b flex justify-between items-center"><h2 class="font-bold">Batch Add</h2><button onclick="App.closeModal('batch')"><i data-lucide="x"></i></button></div><div class="p-6 flex-1 flex flex-col"><textarea id="batch-text" class="w-full flex-1 p-3 border rounded-lg font-mono text-sm h-64" placeholder="Ex: 1. Chrono Trigger #rpg #snes"></textarea><div class="mt-4 flex justify-end gap-2"><button onclick="App.closeModal('batch')" class="px-4 py-2 text-slate-600">Cancelar</button><button onclick="App.processBatch()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">Processar</button></div></div></div></div>
 
-            <div class="flex justify-end gap-3">
-                <button onclick="App.closeModal('mass-tag')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition-colors">Cancelar</button>
-                <button onclick="App.processMassTag()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm">Aplicar Tag</button>
-            </div>
-        </div>
-    </div>
+    <!-- Mass Tag -->
+    <div id="modal-mass-tag" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div class="bg-white rounded-xl w-full max-w-sm p-6 animate-fade-in"><h3 class="font-bold text-lg mb-2">Adicionar Tag em Massa</h3><p class="text-sm text-slate-500 mb-4" id="mass-tag-count"></p><input id="mass-tag-input" class="w-full p-3 border rounded-lg mb-4" placeholder="Nome da tag"><div class="flex justify-end gap-2"><button onclick="App.closeModal('mass-tag')" class="px-4 py-2">Cancelar</button><button onclick="App.processMassTag()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg">Aplicar</button></div></div></div>
 
-    <!-- Modal Random Winner -->
-    <div id="modal-random" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-pop-in relative">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-            
-            <button onclick="App.closeModal('random')" class="absolute top-3 right-3 p-1 bg-white/50 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors z-10">
-                <i data-lucide="x" size="20"></i>
-            </button>
+    <!-- Random -->
+    <div id="modal-random" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div class="bg-white rounded-2xl w-full max-w-md relative p-8 text-center animate-fade-in"><button onclick="App.closeModal('random')" class="absolute top-2 right-2 p-2"><i data-lucide="x"></i></button><div class="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600"><i data-lucide="trophy" size="32"></i></div><h2 class="text-indigo-600 font-bold uppercase text-xs">Vencedor</h2><h3 id="random-winner-name" class="text-2xl font-bold mb-4"></h3><div id="random-winner-img-container" class="hidden h-48 bg-slate-100 rounded-xl mb-4 overflow-hidden"><img id="random-winner-img" class="w-full h-full object-cover"></div><div id="random-winner-tags" class="flex flex-wrap justify-center gap-2 mb-4"></div><p id="random-winner-desc" class="text-sm text-slate-600 italic bg-slate-50 p-3 rounded mb-4"></p><div id="random-winner-actions" class="flex flex-col gap-2 mb-4"></div><button onclick="App.pickRandomItem()" class="w-full bg-slate-800 text-white py-3 rounded-xl flex items-center justify-center gap-2"><i data-lucide="dices"></i> Sortear Outro</button></div></div>
 
-            <div class="p-8 text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 mb-4 shadow-sm">
-                    <i data-lucide="trophy" size="32"></i>
-                </div>
-                
-                <h2 class="text-sm font-bold text-indigo-600 tracking-wide uppercase mb-1">Item Sorteado</h2>
-                <h3 id="random-winner-name" class="text-2xl font-bold text-slate-900 mb-4 leading-tight">Nome do Item</h3>
-                
-                <div id="random-winner-img-container" class="hidden w-full h-48 bg-slate-100 rounded-xl mb-4 overflow-hidden shadow-inner border border-slate-100">
-                    <img id="random-winner-img" src="" class="w-full h-full object-cover">
-                </div>
+    <!-- Confirm -->
+    <div id="modal-confirm" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div class="bg-white rounded-xl p-6 max-w-sm w-full animate-fade-in"><h3 id="confirm-title" class="font-bold text-lg mb-2">Confirmar?</h3><p id="confirm-desc" class="text-slate-600 text-sm mb-4"></p><div class="flex justify-end gap-2"><button onclick="App.closeModal('confirm')" class="px-4 py-2">Cancelar</button><button id="confirm-btn-action" class="bg-red-600 text-white px-4 py-2 rounded-lg">Sim</button></div></div></div>
 
-                <div id="random-winner-tags" class="flex flex-wrap justify-center gap-2 mb-6"></div>
-
-                <p id="random-winner-desc" class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 italic mb-6 line-clamp-4">
-                    Descrição...
-                </p>
-
-                <div id="random-winner-actions" class="flex flex-col gap-2 mb-6"></div>
-
-                <button onclick="App.pickRandomItem()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
-                    <i data-lucide="dices" size="20"></i> Sortear Outro
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Confirmação -->
-    <div id="modal-confirm" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full animate-fade-in">
-            <h3 id="confirm-title" class="text-lg font-bold text-slate-900 mb-2">Confirmar?</h3>
-            <p id="confirm-desc" class="text-slate-600 mb-6 text-sm">Tem certeza?</p>
-            <div class="flex justify-end gap-3">
-                <button onclick="App.closeModal('confirm')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition-colors">Cancelar</button>
-                <button id="confirm-btn-action" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm">Sim, Confirmar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ================= JAVASCRIPT ================= -->
     <script>
+        let sb = null;
+
         const App = {
             data: { active: [], deleted: [] },
             state: { viewMode: 'list', filterTag: '', searchTerm: '', sortBy: 'dateDesc' },
-            
+
+            // --- Inicialização ---
             init() {
-                this.loadData();
-                this.render();
-                window.addEventListener('resize', () => { /* opcional */ });
+                const storedUrl = localStorage.getItem('le_sb_url');
+                const storedKey = localStorage.getItem('le_sb_key');
 
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        ['edit', 'batch', 'mass-tag', 'random', 'confirm'].forEach(m => this.closeModal(m));
-                        document.getElementById('mobile-menu').classList.add('hidden');
-                    }
-                    if (e.key === 'Enter') {
-                        const editModal = document.getElementById('modal-edit');
-                        if (!editModal.classList.contains('hidden')) {
-                            if (document.activeElement.id === 'edit-desc') {
-                                if (e.ctrlKey || e.metaKey) this.saveItem(e);
-                                return;
-                            }
-                        }
-                        const massTagModal = document.getElementById('modal-mass-tag');
-                        if (!massTagModal.classList.contains('hidden')) {
-                            e.preventDefault();
-                            this.processMassTag();
-                            return;
-                        }
-                        const batchModal = document.getElementById('modal-batch');
-                        if (!batchModal.classList.contains('hidden') && (e.ctrlKey || e.metaKey)) {
-                            e.preventDefault();
-                            this.processBatch();
-                            return;
-                        }
-                        const confirmModal = document.getElementById('modal-confirm');
-                        if (!confirmModal.classList.contains('hidden')) {
-                            e.preventDefault();
-                            document.getElementById('confirm-btn-action').click();
-                            return;
-                        }
-                    }
-                });
+                if (storedUrl && storedKey) {
+                    this.connectSupabase(storedUrl, storedKey);
+                } else {
+                    document.getElementById('modal-auth').classList.remove('hidden');
+                    document.getElementById('app-interface').classList.add('hidden');
+                }
+
+                window.addEventListener('resize', () => this.render());
+                document.addEventListener('keydown', (e) => this.handleGlobalKeys(e));
             },
 
-            loadData() {
-                const saved = localStorage.getItem('listaEnormeData_v2');
-                if (saved) {
-                    try {
-                        const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed)) {
-                            this.data.active = parsed;
-                            this.data.deleted = [];
-                        } else {
-                            this.data.active = parsed.active || [];
-                            this.data.deleted = parsed.deleted || [];
-                        }
-                    } catch (e) {
-                        console.error('Erro ao carregar dados', e);
-                    }
+            handleLogin(e) {
+                e.preventDefault();
+                const url = document.getElementById('auth-url').value.trim();
+                const key = document.getElementById('auth-key').value.trim();
+                if (url && key) {
+                    localStorage.setItem('le_sb_url', url);
+                    localStorage.setItem('le_sb_key', key);
+                    this.connectSupabase(url, key);
                 }
             },
 
-            saveData() {
-                localStorage.setItem('listaEnormeData_v2', JSON.stringify(this.data));
-                this.render();
-            },
-
-            getFilteredList(includeSort = true) {
-                const isTrash = this.state.viewMode === 'trash';
-                let list = isTrash ? [...this.data.deleted] : [...this.data.active];
-
-                if (!isTrash) {
-                    if (this.state.searchTerm) {
-                        const term = this.state.searchTerm.toLowerCase();
-                        list = list.filter(item => 
-                            item.name.toLowerCase().includes(term) || 
-                            item.description.toLowerCase().includes(term) ||
-                            item.tags.some(t => t.toLowerCase().includes(term))
-                        );
-                    }
-                    if (this.state.filterTag) {
-                        list = list.filter(item => item.tags.includes(this.state.filterTag));
-                    }
-                    if (includeSort) {
-                        list.sort((a, b) => {
-                            if (this.state.sortBy === 'dateDesc') return b.createdAt - a.createdAt;
-                            if (this.state.sortBy === 'dateAsc') return a.createdAt - b.createdAt;
-                            if (this.state.sortBy === 'alpha') return a.name.localeCompare(b.name);
-                            return 0;
-                        });
-                    }
-                } else {
-                    if (includeSort) {
-                        list.sort((a, b) => b.deletedAt - a.deletedAt);
-                    }
+            logout() {
+                if(confirm('Desconectar e limpar chaves salvas?')) {
+                    localStorage.removeItem('le_sb_url');
+                    localStorage.removeItem('le_sb_key');
+                    location.reload();
                 }
-                return list;
             },
 
-            toggleMobileMenu() {
-                const menu = document.getElementById('mobile-menu');
-                menu.classList.toggle('hidden');
+            connectSupabase(url, key) {
+                try {
+                    sb = supabase.createClient(url, key);
+                    document.getElementById('modal-auth').classList.add('hidden');
+                    document.getElementById('app-interface').classList.remove('hidden');
+                    this.loadData();
+                } catch (err) {
+                    alert('Erro ao conectar: ' + err.message);
+                    localStorage.removeItem('le_sb_url');
+                    localStorage.removeItem('le_sb_key');
+                    location.reload();
+                }
             },
 
-            render() {
-                const isTrash = this.state.viewMode === 'trash';
-                const isGrid = this.state.viewMode === 'grid';
-                const isList = this.state.viewMode === 'list';
+            toggleLoading(show) {
+                const el = document.getElementById('loading-overlay');
+                if(show) el.classList.add('active'); else el.classList.remove('active');
+            },
 
-                // Desktop View Buttons Active State
-                const btnClass = "p-2 rounded-md transition-all";
-                const activeClass = "bg-white shadow-sm text-indigo-600";
-                const inactiveClass = "text-slate-500 hover:text-slate-700";
-                
-                document.getElementById('btn-view-list-d').className = `${btnClass} ${isList ? activeClass : inactiveClass}`;
-                document.getElementById('btn-view-grid-d').className = `${btnClass} ${isGrid ? activeClass : inactiveClass}`;
-                document.getElementById('btn-view-trash-d').className = `${btnClass} flex items-center gap-2 ${isTrash ? 'bg-red-50 text-red-600' : inactiveClass.replace('slate-700', 'red-600')}`;
+            async loadData() {
+                if (!sb) return;
+                this.toggleLoading(true);
+                const { data, error } = await sb.from('items').select('*');
+                this.toggleLoading(false);
 
-                // Mobile View Buttons Active State
-                const mBtnClass = "p-2 rounded-lg";
-                document.getElementById('btn-view-list-m').className = `${mBtnClass} ${isList ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`;
-                document.getElementById('btn-view-grid-m').className = `${mBtnClass} ${isGrid ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`;
-                document.getElementById('btn-view-trash-m').className = `${mBtnClass} relative ${isTrash ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-red-600'}`;
+                if (error) {
+                    console.error(error);
+                    this.showToast('Erro ao carregar: ' + error.message, 'error');
+                    if(error.message.includes('API key')) this.logout();
+                    return;
+                }
 
-                // Control Visibility
-                document.getElementById('controls-bar').style.display = isTrash ? 'none' : (window.innerWidth >= 768 ? 'flex' : 'block'); // MD breakpoint
-                document.getElementById('trash-header').style.display = isTrash ? 'flex' : 'none';
-                document.getElementById('fab-create').style.display = isTrash ? 'none' : 'flex'; // Mobile only via CSS media query, but hidden in logic too
+                if (data) {
+                    this.data.active = data.filter(i => !i.is_deleted);
+                    this.data.deleted = data.filter(i => i.is_deleted);
+                    this.render();
+                }
+            },
 
-                // Badges
-                const listToRender = this.getFilteredList(true);
-                const totalActive = this.data.active.length;
-                const visibleCount = listToRender.length;
-                const badgeText = isTrash 
-                    ? `${this.data.deleted.length} na lixeira` 
-                    : (visibleCount !== totalActive ? `${visibleCount} / ${totalActive}` : `${totalActive} itens`);
-                
-                document.getElementById('item-count-badge').textContent = badgeText;
-                
-                // Trash Count Badges
-                const trashCount = this.data.deleted.length;
-                const trashBadgeD = document.getElementById('trash-count-badge-d');
-                trashBadgeD.textContent = trashCount;
-                trashBadgeD.classList.toggle('hidden', trashCount === 0);
-                
-                const trashDotM = document.getElementById('trash-dot-m');
-                if (trashDotM) trashDotM.classList.toggle('hidden', trashCount === 0);
+            // --- Novas Funcionalidades ---
+            
+            // 3. Migração de Dados Locais
+            async migrateLocalData() {
+                const legacyData = localStorage.getItem('listaEnormeData_v2');
+                if (!legacyData) {
+                    this.showToast('Nenhum dado local encontrado.', 'error');
+                    return;
+                }
 
-                // Render Items
-                const container = document.getElementById('items-container');
-                container.innerHTML = '';
+                if(!confirm('Isso enviará todos os dados salvos localmente para o Supabase. Continuar?')) return;
 
-                if (listToRender.length === 0) {
-                    container.innerHTML = `
-                        <div class="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 mx-4 md:mx-0">
-                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-4">
-                                <i data-lucide="${isTrash ? 'trash-2' : 'search'}" class="w-8 h-8 text-slate-400"></i>
-                            </div>
-                            <h3 class="text-lg font-medium text-slate-900">${isTrash ? 'Lixeira vazia' : 'Nada aqui'}</h3>
-                            <p class="text-slate-500 text-sm px-4">${isTrash ? 'Tudo limpo por aqui.' : 'Adicione itens pelo botão "+" abaixo.'}</p>
-                        </div>
-                    `;
-                } else {
-                    if (isGrid && !isTrash) {
-                        const grid = document.createElement('div');
-                        grid.className = "grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6";
-                        grid.innerHTML = listToRender.map(item => this.templates.card(item)).join('');
-                        container.appendChild(grid);
-                    } else if (isTrash) {
-                        const list = document.createElement('div');
-                        list.className = "bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100 overflow-hidden";
-                        list.innerHTML = listToRender.map(item => this.templates.trashRow(item)).join('');
-                        container.appendChild(list);
+                try {
+                    const parsed = JSON.parse(legacyData);
+                    let itemsToInsert = [];
+
+                    // Normaliza dados antigos
+                    if (Array.isArray(parsed)) {
+                        itemsToInsert = parsed.map(i => ({...i, is_deleted: false}));
                     } else {
-                        const list = document.createElement('div');
-                        list.className = "space-y-4";
-                        list.innerHTML = listToRender.map(item => this.templates.row(item)).join('');
-                        container.appendChild(list);
+                        const actives = (parsed.active || []).map(i => ({...i, is_deleted: false}));
+                        const deleteds = (parsed.deleted || []).map(i => ({...i, is_deleted: true}));
+                        itemsToInsert = [...actives, ...deleteds];
                     }
-                }
 
-                if (!isTrash) {
-                    this.updateTagOptions();
-                }
-
-                lucide.createIcons();
-            },
-
-            updateTagOptions() {
-                const select = document.getElementById('tag-filter');
-                const tags = new Set();
-                this.data.active.forEach(i => i.tags.forEach(t => tags.add(t)));
-                const sortedTags = Array.from(tags).sort();
-                let html = '<option value="">Todas as Tags</option>';
-                sortedTags.forEach(tag => {
-                    html += `<option value="${tag}" ${tag === this.state.filterTag ? 'selected' : ''}>${tag}</option>`;
-                });
-                if (select.options.length - 1 !== sortedTags.length) {
-                    select.innerHTML = html;
-                    select.value = this.state.filterTag;
-                }
-            },
-
-            setViewMode(mode) {
-                this.state.viewMode = mode;
-                this.render();
-            },
-
-            handleSearch(val) {
-                this.state.searchTerm = val;
-                this.render();
-            },
-
-            handleSort(val) {
-                this.state.sortBy = val;
-                this.render();
-            },
-
-            handleTagFilter(val) {
-                this.state.filterTag = val;
-                this.render();
-            },
-
-            getFormattedUrl(type, value) {
-                if (!value) return '';
-                if (type === 'local') {
-                    let path = value.replace(/^"|"$/g, '').trim();
-                    path = path.replace(/\\/g, '/');
-                    if (!path.startsWith('file:///')) {
-                        if (/^[a-zA-Z]:/.test(path)) {
-                            return 'file:///' + path;
-                        }
-                        return 'file://' + path;
+                    if (itemsToInsert.length === 0) {
+                        this.showToast('Backup local vazio.');
+                        return;
                     }
-                    return path;
+
+                    this.toggleLoading(true);
+                    const { error } = await sb.from('items').upsert(itemsToInsert);
+                    this.toggleLoading(false);
+
+                    if (error) {
+                        this.showToast('Erro na migração: ' + error.message, 'error');
+                    } else {
+                        this.showToast('Migração concluída com sucesso!');
+                        this.loadData(); // Recarrega do banco
+                    }
+                } catch (e) {
+                    this.showToast('Erro ao ler dados locais.', 'error');
                 }
-                return value;
             },
 
-            selectTag(tag) {
-                this.state.filterTag = tag;
-                document.getElementById('tag-filter').value = tag;
-                this.render();
-            },
-
+            // 1. Mass Tag Modal
             openMassTagModal() {
                 const currentList = this.getFilteredList(false);
                 if (currentList.length === 0) {
@@ -620,411 +331,388 @@
                 this.openModal('mass-tag');
             },
 
-            processMassTag() {
+            async processMassTag() {
                 const tag = document.getElementById('mass-tag-input').value.trim();
                 if (!tag) return;
-                const currentList = this.getFilteredList(false);
-                let changedCount = 0;
-                currentList.forEach(item => {
-                    const realItem = this.data.active.find(i => i.id === item.id);
-                    if (realItem && !realItem.tags.includes(tag)) {
-                        realItem.tags.push(tag);
-                        changedCount++;
+                const list = this.getFilteredList(false);
+                const updates = [];
+                
+                list.forEach(item => {
+                    // Busca referência no array principal
+                    const real = this.data.active.find(i => i.id === item.id);
+                    if (real && !real.tags.includes(tag)) {
+                        real.tags.push(tag);
+                        updates.push(real);
                     }
                 });
-                if (changedCount > 0) {
-                    this.saveData();
-                    this.showToast(`Tag adicionada a ${changedCount} itens.`);
-                }
+
                 this.closeModal('mass-tag');
-            },
-
-            pickRandomItem() {
-                const currentList = this.getFilteredList(false);
-                if (currentList.length === 0) {
-                    this.showToast('Lista vazia.', 'error');
-                    return;
-                }
-                const winnerIndex = Math.floor(Math.random() * currentList.length);
-                const winner = currentList[winnerIndex];
-
-                document.getElementById('random-winner-name').textContent = winner.name;
-                document.getElementById('random-winner-desc').textContent = winner.description || 'Sem descrição.';
-                
-                const imgContainer = document.getElementById('random-winner-img-container');
-                const img = document.getElementById('random-winner-img');
-                if (winner.imageUrl) {
-                    img.src = winner.imageUrl;
-                    imgContainer.classList.remove('hidden');
+                if (updates.length > 0) {
+                    this.render();
+                    this.showToast('Salvando tags...');
+                    const { error } = await sb.from('items').upsert(updates);
+                    if(error) this.showToast(`Erro Tag: ${error.message}`, 'error');
                 } else {
-                    imgContainer.classList.add('hidden');
+                    this.showToast('Nenhuma alteração necessária.');
                 }
+            },
 
-                const tagsContainer = document.getElementById('random-winner-tags');
-                tagsContainer.innerHTML = winner.tags.map(t => 
-                    `<span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-semibold shadow-sm">#${this.escapeHtml(t)}</span>`
-                ).join('');
-
-                const actionsContainer = document.getElementById('random-winner-actions');
-                actionsContainer.innerHTML = '';
+            // 2. Process Batch com Hashtags
+            async processBatch() {
+                const text = document.getElementById('batch-text').value;
+                if (!text.trim()) return;
+                const lines = text.split('\n').filter(l => l.trim());
                 
-                if (winner.linkUrl) {
-                    actionsContainer.innerHTML += `
-                        <a href="${App.escapeHtml(winner.linkUrl)}" target="_blank" class="flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-800 font-medium p-2 bg-indigo-50 rounded-lg">
-                            <i data-lucide="external-link" width="16"></i> Abrir Web
-                        </a>
-                    `;
-                }
-                if (winner.localPath) {
-                    const url = App.getFormattedUrl('local', winner.localPath);
-                    actionsContainer.innerHTML += `
-                        <a href="${url}" target="_blank" class="flex items-center justify-center gap-2 text-amber-600 hover:text-amber-800 font-medium p-2 bg-amber-50 rounded-lg">
-                            <i data-lucide="folder-open" width="16"></i> Abrir Local
-                        </a>
-                    `;
-                }
-
-                this.openModal('random');
-                setTimeout(() => lucide.createIcons(), 50);
-            },
-
-            templates: {
-                row(item) {
-                    const date = new Date(item.createdAt).toLocaleDateString('pt-BR');
-                    const tagsHtml = item.tags.map(t => `<button onclick="event.stopPropagation(); App.selectTag('${App.escapeHtml(t)}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium transition-colors">#${App.escapeHtml(t)}</button>`).join('');
+                const newItems = lines.map((line, i) => {
+                    // 1. Remove numeração
+                    let clean = line.replace(/^\d+\.\s*/, '');
                     
-                    let imageBlock = '';
-                    if (item.imageUrl) {
-                        imageBlock = `
-                        <div class="w-24 h-24 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden border border-slate-100 relative group hidden sm:block">
-                            <img src="${App.escapeHtml(item.imageUrl)}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
-                            <div class="absolute inset-0 hidden items-center justify-center text-slate-300 bg-slate-50">
-                                <i data-lucide="image-off" size="24"></i>
-                            </div>
-                        </div>`;
-                    }
+                    // 2. Extrai descrições [] {}
+                    const bracket = /(\[.*?\]|\{.*?\})/g;
+                    const matches = clean.match(bracket);
+                    const desc = matches ? matches.join(' ') : '';
+                    clean = clean.replace(bracket, '').trim();
 
-                    let linkBtns = '';
-                    if (item.linkUrl) {
-                        linkBtns += `<a href="${App.escapeHtml(item.linkUrl)}" target="_blank" class="p-2 text-slate-400 hover:text-blue-600 rounded-md transition-colors" title="Web"><i data-lucide="globe" width="18"></i></a>`;
-                    }
-                    if (item.localPath) {
-                        const url = App.getFormattedUrl('local', item.localPath);
-                        linkBtns += `<a href="${url}" target="_blank" class="p-2 text-slate-400 hover:text-amber-600 rounded-md transition-colors" title="Local"><i data-lucide="hard-drive" width="18"></i></a>`;
-                    }
+                    // 3. Extrai hashtags (#tag)
+                    const tagRegex = /#(\w+)/g;
+                    const tagsFound = (clean.match(tagRegex) || []).map(t => t.substring(1)); // Remove o #
+                    const name = clean.replace(tagRegex, '').trim(); // Remove hashtags do nome
 
-                    return `
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row gap-4 hover:shadow-md transition-shadow">
-                        ${imageBlock}
-                        <div class="flex-1 min-w-0">
-                            <div class="flex justify-between items-start">
-                                <h3 class="text-lg font-semibold text-slate-900 leading-tight mb-1 pr-2">${App.escapeHtml(item.name)}</h3>
-                                <div class="flex items-center gap-0.5 ml-1">
-                                    ${linkBtns}
-                                    <div class="w-px h-4 bg-slate-200 mx-1"></div>
-                                    <button onclick="App.bumpItem('${item.id}')" class="p-2 text-slate-400 hover:text-green-600 rounded-md transition-colors"><i data-lucide="arrow-up" width="18"></i></button>
-                                    <button onclick="App.prepareEdit('${item.id}')" class="p-2 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"><i data-lucide="edit-2" width="18"></i></button>
-                                    <button onclick="App.askDelete('${item.id}')" class="p-2 text-slate-400 hover:text-red-600 rounded-md transition-colors"><i data-lucide="trash-2" width="18"></i></button>
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2 mb-2 text-xs text-slate-500">
-                                <span class="flex items-center gap-1"><i data-lucide="calendar" width="12"></i> ${date}</span>
-                                ${tagsHtml ? '<span class="text-slate-300">|</span>' + tagsHtml : ''}
-                            </div>
-                            <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-3">${App.escapeHtml(item.description || '')}</p>
-                        </div>
-                    </div>`;
-                },
-                card(item) {
-                    const tagsHtml = item.tags.slice(0, 3).map(t => `<button onclick="event.stopPropagation(); App.selectTag('${App.escapeHtml(t)}')" class="text-[10px] uppercase tracking-wider font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded transition-colors">${App.escapeHtml(t)}</button>`).join('');
-                    
-                    let linksHtml = '';
-                    if (item.linkUrl) {
-                        linksHtml += `<a href="${App.escapeHtml(item.linkUrl)}" target="_blank" onclick="event.stopPropagation();" class="p-2 bg-white text-slate-700 hover:text-blue-600 rounded-lg shadow-md border border-slate-100 transition-colors mb-1 flex items-center justify-center"><i data-lucide="globe" width="16"></i></a>`;
-                    }
-                    if (item.localPath) {
-                        const url = App.getFormattedUrl('local', item.localPath);
-                        linksHtml += `<a href="${url}" target="_blank" onclick="event.stopPropagation();" class="p-2 bg-white text-slate-700 hover:text-amber-600 rounded-lg shadow-md border border-slate-100 transition-colors flex items-center justify-center"><i data-lucide="hard-drive" width="16"></i></a>`;
-                    }
+                    return {
+                        id: crypto.randomUUID(),
+                        name: name || "Sem Nome", // Fallback
+                        description: desc,
+                        imageUrl: '', linkUrl: '', localPath: '', 
+                        tags: tagsFound,
+                        createdAt: Date.now() + i, 
+                        is_deleted: false
+                    };
+                });
 
-                    const safeLinksHtml = item.imageUrl ? linksHtml : linksHtml.replace(/bg-white/g, 'bg-slate-100');
-                    
-                    let contentHtml = '';
-                    
-                    if (item.imageUrl) {
-                        contentHtml = `
-                        <div class="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-                            <img src="${App.escapeHtml(item.imageUrl)}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
-                            <div class="absolute inset-0 hidden items-center justify-center text-slate-300 bg-slate-50">
-                                <i data-lucide="image-off" width="32"></i>
-                            </div>
-                            <div class="absolute top-2 right-2 z-20 flex flex-col items-end">
-                                ${safeLinksHtml}
-                            </div>
-                        </div>
-                        <div class="p-4 flex-1 flex flex-col">
-                            <h3 class="font-semibold text-slate-900 mb-2 line-clamp-2 text-sm leading-snug">${App.escapeHtml(item.name)}</h3>
-                            <div class="mt-auto flex flex-wrap gap-1.5">
-                                ${tagsHtml || '<span class="text-[10px] text-slate-400 italic">Sem tags</span>'}
-                            </div>
-                        </div>`;
-                    } else {
-                        contentHtml = `
-                        <div class="p-4 flex-1 flex flex-col relative h-full">
-                            <div class="absolute top-2 right-2 z-20 flex flex-col items-end">
-                                ${safeLinksHtml}
-                            </div>
-                            <h3 class="font-semibold text-slate-900 mb-3 pr-8 line-clamp-4 leading-snug text-sm">${App.escapeHtml(item.name)}</h3>
-                            <div class="mt-auto flex flex-wrap gap-1.5 pt-2">
-                                ${tagsHtml || '<span class="text-[10px] text-slate-400 italic">Sem tags</span>'}
-                            </div>
-                        </div>`;
-                    }
-
-                    return `
-                    <div class="group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full active:scale-[0.98] transition-transform">
-                        ${contentHtml}
-                    </div>`;
-                },
-                trashRow(item) {
-                    const date = new Date(item.deletedAt).toLocaleDateString('pt-BR');
-                    return `
-                    <div class="p-4 flex items-center justify-between hover:bg-slate-50 group">
-                        <div>
-                            <h3 class="font-medium text-slate-700 decoration-slate-400 line-through decoration-2">${App.escapeHtml(item.name)}</h3>
-                            <p class="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                                <i data-lucide="trash-2" width="10"></i> ${date}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="App.restoreItem('${item.id}')" class="p-2 text-indigo-600 bg-indigo-50 rounded-lg">
-                                <i data-lucide="rotate-ccw" width="16"></i>
-                            </button>
-                            <button onclick="App.askPermanentDelete('${item.id}')" class="p-2 text-red-600 bg-red-50 rounded-lg">
-                                <i data-lucide="x" width="16"></i>
-                            </button>
-                        </div>
-                    </div>`;
+                this.data.active = [...newItems, ...this.data.active];
+                this.closeModal('batch');
+                document.getElementById('batch-text').value = '';
+                this.render();
+                this.showToast(`Adicionando ${newItems.length} itens...`);
+                if(sb) {
+                    const { error } = await sb.from('items').insert(newItems);
+                    if(error) this.showToast('Erro batch: '+error.message, 'error');
                 }
             },
 
-            prepareCreate() {
-                document.getElementById('form-edit').reset();
-                document.getElementById('edit-id').value = '';
-                document.getElementById('modal-edit-title').textContent = 'Novo Item';
-                this.previewImage('');
-                this.openModal('edit');
+            // --- Database Helpers ---
+            async dbUpsert(item) {
+                if(!sb) return;
+                const { error } = await sb.from('items').upsert(item);
+                if(error) this.showToast('Erro ao salvar: ' + error.message, 'error');
+            },
+            async dbSoftDelete(id) {
+                if(!sb) return;
+                const { error } = await sb.from('items').update({ is_deleted: true, "deletedAt": Date.now() }).eq('id', id);
+                if(error) this.showToast('Erro ao deletar', 'error');
+            },
+            async dbRestore(id) {
+                if(!sb) return;
+                const { error } = await sb.from('items').update({ is_deleted: false, "deletedAt": null }).eq('id', id);
+                if(error) this.showToast('Erro ao restaurar', 'error');
+            },
+            async dbPermDelete(id) {
+                if(!sb) return;
+                const { error } = await sb.from('items').delete().eq('id', id);
+                if(error) this.showToast('Erro permanente', 'error');
             },
 
-            bumpItem(id) {
-                const index = this.data.active.findIndex(i => i.id === id);
-                if (index > -1) {
-                    const item = this.data.active[index];
-                    item.createdAt = Date.now();
-                    this.data.active.splice(index, 1);
-                    this.data.active.unshift(item);
-                    if (this.state.sortBy !== 'dateDesc') {
-                        this.showToast('Data atualizada!');
-                    } else {
-                        this.showToast('Item subiu para o topo!');
-                    }
-                    this.saveData();
-                }
-            },
-
-            prepareEdit(id) {
-                const item = this.data.active.find(i => i.id === id);
-                if (!item) return;
-                document.getElementById('edit-id').value = item.id;
-                document.getElementById('edit-name').value = item.name;
-                document.getElementById('edit-tags').value = item.tags.join(', ');
-                document.getElementById('edit-image').value = item.imageUrl || '';
-                document.getElementById('edit-link').value = item.linkUrl || '';
-                document.getElementById('edit-local-path').value = item.localPath || '';
-                document.getElementById('edit-desc').value = item.description || '';
-                document.getElementById('modal-edit-title').textContent = 'Editar Item';
-                this.previewImage(item.imageUrl || '');
-                this.openModal('edit');
-            },
-
+            // --- CRUD ---
             saveItem(e) {
                 if (e) e.preventDefault();
-                const id = document.getElementById('edit-id').value;
-                const name = document.getElementById('edit-name').value;
-                const tagsStr = document.getElementById('edit-tags').value;
-                const imageUrl = document.getElementById('edit-image').value;
-                const linkUrl = document.getElementById('edit-link').value.trim();
-                const rawLocalPath = document.getElementById('edit-local-path').value;
-                const localPath = rawLocalPath ? rawLocalPath.replace(/^"|"$/g, '').trim() : '';
-                const description = document.getElementById('edit-desc').value;
-                const tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+                const id = document.getElementById('edit-id').value || crypto.randomUUID();
+                const item = {
+                    id: id,
+                    name: document.getElementById('edit-name').value,
+                    tags: document.getElementById('edit-tags').value.split(',').map(t=>t.trim()).filter(t=>t),
+                    imageUrl: document.getElementById('edit-image').value,
+                    linkUrl: document.getElementById('edit-link').value.trim(),
+                    localPath: document.getElementById('edit-local-path').value.replace(/^"|"$/g, '').trim(),
+                    description: document.getElementById('edit-desc').value,
+                    createdAt: Date.now(),
+                    is_deleted: false
+                };
 
-                if (id) {
-                    const index = this.data.active.findIndex(i => i.id === id);
-                    if (index > -1) {
-                        this.data.active[index] = { ...this.data.active[index], name, tags, imageUrl, linkUrl, localPath, description };
-                    }
-                } else {
-                    const newItem = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        createdAt: Date.now(),
-                        name, tags, imageUrl, linkUrl, localPath, description
-                    };
-                    this.data.active.unshift(newItem);
-                }
-                this.saveData();
+                const idx = this.data.active.findIndex(i => i.id === id);
+                if (idx > -1) this.data.active[idx] = item;
+                else this.data.active.unshift(item);
+
                 this.closeModal('edit');
+                this.render();
                 this.showToast('Item salvo!');
+                this.dbUpsert(item);
             },
 
             askDelete(id) {
-                this.executeDelete(id);
-            },
-
-            executeDelete(id) {
-                const itemIndex = this.data.active.findIndex(i => i.id === id);
-                if (itemIndex > -1) {
-                    const item = this.data.active[itemIndex];
-                    this.data.active.splice(itemIndex, 1);
-                    this.data.deleted.unshift({ ...item, deletedAt: Date.now() });
-                    this.saveData();
-                    this.showToast('Item na lixeira.');
+                const idx = this.data.active.findIndex(i => i.id === id);
+                if (idx > -1) {
+                    const item = this.data.active[idx];
+                    this.data.active.splice(idx, 1);
+                    item.deletedAt = Date.now();
+                    this.data.deleted.unshift(item);
+                    this.render();
+                    this.showToast('Movido para lixeira');
+                    this.dbSoftDelete(id);
                 }
             },
 
             askPermanentDelete(id) {
                 const item = this.data.deleted.find(i => i.id === id);
                 if (!item) return;
+                document.getElementById('confirm-title').innerText = 'Excluir?';
+                document.getElementById('confirm-desc').innerText = item.name;
                 const btn = document.getElementById('confirm-btn-action');
-                document.getElementById('confirm-title').textContent = 'Excluir?';
-                document.getElementById('confirm-desc').textContent = `"${item.name}" sumirá para sempre.`;
-                btn.className = "bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm";
-                btn.textContent = "Excluir";
                 btn.onclick = () => {
-                    this.executePermanentDelete(id);
+                    const idx = this.data.deleted.findIndex(i => i.id === id);
+                    if (idx > -1) {
+                        this.data.deleted.splice(idx, 1);
+                        this.render();
+                        this.showToast('Excluído.');
+                        this.dbPermDelete(id);
+                    }
                     this.closeModal('confirm');
                 };
                 this.openModal('confirm');
             },
 
-            executePermanentDelete(id) {
-                const itemIndex = this.data.deleted.findIndex(i => i.id === id);
-                if (itemIndex > -1) {
-                    this.data.deleted.splice(itemIndex, 1);
-                    this.saveData();
-                    this.showToast('Tchau item!');
-                }
-            },
-
             restoreItem(id) {
-                const itemIndex = this.data.deleted.findIndex(i => i.id === id);
-                if (itemIndex > -1) {
-                    const item = this.data.deleted[itemIndex];
-                    this.data.deleted.splice(itemIndex, 1);
-                    delete item.deletedAt;
+                const idx = this.data.deleted.findIndex(i => i.id === id);
+                if (idx > -1) {
+                    const item = this.data.deleted[idx];
+                    this.data.deleted.splice(idx, 1);
                     this.data.active.unshift(item);
-                    this.saveData();
-                    this.showToast('Restaurado!');
+                    this.render();
+                    this.showToast('Restaurado');
+                    this.dbRestore(id);
                 }
             },
 
-            processBatch() {
-                const text = document.getElementById('batch-text').value;
-                if (!text.trim()) return;
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                const newItems = lines.map((line, index) => {
-                    let cleanLine = line.replace(/^\d+\.\s*/, '');
-                    const bracketRegex = /(\[.*?\]|\{.*?\})/g;
-                    const matches = cleanLine.match(bracketRegex);
-                    const description = matches ? matches.join(' ') : '';
-                    const name = cleanLine.replace(bracketRegex, '').trim();
-                    return {
-                        id: Math.random().toString(36).substr(2, 9) + index,
-                        name: name,
-                        description: description,
-                        imageUrl: '',
-                        linkUrl: '',
-                        localPath: '',
-                        tags: [],
-                        createdAt: Date.now() + index
-                    };
-                });
-                this.data.active = [...newItems, ...this.data.active];
-                this.saveData();
-                this.closeModal('batch');
-                document.getElementById('batch-text').value = '';
-                this.showToast(`${newItems.length} adicionados!`);
+            bumpItem(id) {
+                const idx = this.data.active.findIndex(i => i.id === id);
+                if (idx > -1) {
+                    const item = this.data.active[idx];
+                    item.createdAt = Date.now();
+                    this.data.active.splice(idx, 1);
+                    this.data.active.unshift(item);
+                    if(this.state.sortBy !== 'dateDesc') this.showToast('Atualizado!');
+                    else this.showToast('Subiu pro topo!');
+                    this.render();
+                    this.dbUpsert(item);
+                }
             },
 
+            pickRandomItem() {
+                const list = this.getFilteredList(false);
+                if (!list.length) { this.showToast('Lista vazia', 'error'); return; }
+                const winner = list[Math.floor(Math.random() * list.length)];
+                
+                document.getElementById('random-winner-name').textContent = winner.name;
+                document.getElementById('random-winner-desc').textContent = winner.description || 'Sem descrição';
+                
+                const imgC = document.getElementById('random-winner-img-container');
+                const img = document.getElementById('random-winner-img');
+                if (winner.imageUrl) { imgC.classList.remove('hidden'); img.src = winner.imageUrl; } else { imgC.classList.add('hidden'); }
+
+                const tagsC = document.getElementById('random-winner-tags');
+                tagsC.innerHTML = winner.tags.map(t => `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">#${t}</span>`).join('');
+
+                const actsC = document.getElementById('random-winner-actions');
+                actsC.innerHTML = '';
+                if(winner.linkUrl) actsC.innerHTML += `<a href="${winner.linkUrl}" target="_blank" class="block bg-indigo-50 text-indigo-700 p-2 rounded text-center font-bold mb-2">Abrir Web</a>`;
+                if(winner.localPath) actsC.innerHTML += `<a href="file:///${winner.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" class="block bg-amber-50 text-amber-700 p-2 rounded text-center font-bold">Abrir Local</a>`;
+
+                this.openModal('random');
+                lucide.createIcons();
+            },
+
+            // --- UI Core ---
+            setViewMode(m) { this.state.viewMode = m; this.render(); },
+            handleSearch(v) { this.state.searchTerm = v; this.render(); },
+            handleSort(v) { this.state.sortBy = v; this.render(); },
+            handleTagFilter(v) { this.state.filterTag = v; this.render(); },
+            selectTag(t) { this.state.filterTag = t; document.getElementById('tag-filter').value = t; this.render(); },
+            toggleMobileMenu() { document.getElementById('mobile-menu').classList.toggle('hidden'); },
+            
+            prepareCreate() { document.getElementById('form-edit').reset(); document.getElementById('edit-id').value=''; document.getElementById('modal-edit-title').innerText='Novo Item'; this.previewImage(''); this.openModal('edit'); },
+            openModal(id) { document.getElementById('modal-'+id).classList.remove('hidden'); },
+            closeModal(id) { document.getElementById('modal-'+id).classList.add('hidden'); },
+            previewImage(url) { 
+                const c = document.getElementById('image-preview-container'); 
+                const i = document.getElementById('image-preview');
+                if(url) { c.classList.remove('hidden'); i.src = url; } else { c.classList.add('hidden'); }
+            },
+            showToast(msg, type='success') {
+                const el = document.createElement('div');
+                el.className = `px-4 py-3 rounded-xl shadow-xl text-white text-sm font-medium animate-fade-in ${type==='error'?'bg-red-500':'bg-slate-800'}`;
+                el.innerText = msg;
+                document.getElementById('toast-container').appendChild(el);
+                setTimeout(()=>el.remove(), 3000);
+            },
+            
+            // Export
             exportData() {
-                const dataStr = JSON.stringify(this.data, null, 2);
-                const blob = new Blob([dataStr], { type: 'application/json' });
+                const blob = new Blob([JSON.stringify(this.data, null, 2)], {type: 'application/json'});
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `lista-enorme-${new Date().toISOString().slice(0,10)}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                const a = document.createElement('a'); a.href = url; a.download = `backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
             },
-
-            handleImport(input) {
+            // Import (Arquivo)
+            handleImport(input) { 
                 const file = input.files[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     try {
                         const json = JSON.parse(e.target.result);
-                        const btn = document.getElementById('confirm-btn-action');
-                        document.getElementById('confirm-title').textContent = 'Substituir?';
-                        let countActive = Array.isArray(json) ? json.length : (json.active?.length || 0);
-                        document.getElementById('confirm-desc').innerHTML = `Apaga tudo atual.<br>Novos: <strong>${countActive}</strong>`;
-                        btn.className = "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm";
-                        btn.textContent = "Importar";
-                        btn.onclick = () => {
-                            if (Array.isArray(json)) {
-                                this.data.active = json;
-                                this.data.deleted = [];
-                            } else {
-                                this.data.active = json.active || [];
-                                this.data.deleted = json.deleted || [];
+                        if(confirm(`Importar ${Array.isArray(json) ? json.length : (json.active?.length || 0)} itens e enviar para o banco?`)) {
+                            // Normaliza e envia via batch
+                            let items = [];
+                            if (Array.isArray(json)) items = json.map(i => ({...i, is_deleted: false}));
+                            else {
+                                items = [...(json.active||[]).map(i=>({...i, is_deleted: false})), ...(json.deleted||[]).map(i=>({...i, is_deleted: true}))];
                             }
-                            this.saveData();
-                            this.closeModal('confirm');
-                            this.showToast('Importado!');
-                        };
-                        this.openModal('confirm');
-                    } catch (err) {
-                        this.showToast('JSON inválido', 'error');
-                    }
+                            this.toggleLoading(true);
+                            const { error } = await sb.from('items').upsert(items);
+                            this.toggleLoading(false);
+                            if(error) this.showToast('Erro import: ' + error.message, 'error');
+                            else { this.showToast('Importado!'); this.loadData(); }
+                        }
+                    } catch(err) { this.showToast('JSON inválido', 'error'); }
                     input.value = '';
                 };
                 reader.readAsText(file);
             },
 
-            openModal(name) { document.getElementById(`modal-${name}`).classList.remove('hidden'); },
-            closeModal(name) { document.getElementById(`modal-${name}`).classList.add('hidden'); },
-            previewImage(url) {
-                const container = document.getElementById('image-preview-container');
-                const img = document.getElementById('image-preview');
-                if (url) {
-                    container.classList.remove('hidden');
-                    img.src = url;
-                } else {
-                    container.classList.add('hidden');
-                    img.src = '';
+            handleGlobalKeys(e) {
+                if(e.key === 'Escape') {
+                    ['edit','batch','mass-tag','random','confirm'].forEach(m => this.closeModal(m));
+                    document.getElementById('mobile-menu').classList.add('hidden');
                 }
             },
-            escapeHtml(text) {
-                if (!text) return text;
-                return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
+            getFilteredList(sort = true) {
+                const isTrash = this.state.viewMode === 'trash';
+                let list = isTrash ? [...this.data.deleted] : [...this.data.active];
+                
+                if (!isTrash) {
+                    if (this.state.searchTerm) {
+                        const t = this.state.searchTerm.toLowerCase();
+                        list = list.filter(i => i.name.toLowerCase().includes(t) || (i.description||'').toLowerCase().includes(t) || i.tags.some(tg => tg.toLowerCase().includes(t)));
+                    }
+                    if (this.state.filterTag) {
+                        list = list.filter(i => i.tags.includes(this.state.filterTag));
+                    }
+                    if (sort) {
+                        const s = this.state.sortBy;
+                        list.sort((a, b) => {
+                            if (s === 'dateDesc') return b.createdAt - a.createdAt;
+                            if (s === 'dateAsc') return a.createdAt - b.createdAt;
+                            if (s === 'alpha') return a.name.localeCompare(b.name);
+                            return 0;
+                        });
+                    }
+                } else {
+                    if (sort) list.sort((a, b) => b.deletedAt - a.deletedAt);
+                }
+                return list;
             },
-            showToast(msg, type = 'success') {
-                const toast = document.createElement('div');
-                toast.className = `px-4 py-3 rounded-lg shadow-lg text-white font-medium text-sm animate-fade-in ${type === 'error' ? 'bg-red-500' : 'bg-slate-800'}`;
-                toast.textContent = msg;
-                document.getElementById('toast-container').appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
+
+            updateTagOptions() {
+                const sel = document.getElementById('tag-filter');
+                if (sel.options.length <= 1) {
+                    const tags = new Set();
+                    this.data.active.forEach(i => i.tags.forEach(t => tags.add(t)));
+                    Array.from(tags).sort().forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t; opt.innerText = t;
+                        sel.appendChild(opt);
+                    });
+                }
+            },
+
+            render() {
+                const isTrash = this.state.viewMode === 'trash';
+                const isGrid = this.state.viewMode === 'grid';
+                const isList = this.state.viewMode === 'list';
+                const list = this.getFilteredList(true);
+
+                // UI Logic
+                document.getElementById('controls-bar').style.display = isTrash ? 'none' : (window.innerWidth >= 768 ? 'flex' : 'block');
+                document.getElementById('trash-header').style.display = isTrash ? 'flex' : 'none';
+                document.getElementById('fab-create').style.display = isTrash ? 'none' : 'flex';
+
+                // Desktop Btn States
+                const setD = (id, on) => document.getElementById(id).className = `p-2 rounded-md transition-all ${on ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`;
+                setD('btn-view-list-d', isList);
+                setD('btn-view-grid-d', isGrid);
+                document.getElementById('btn-view-trash-d').className = `p-2 rounded-md transition-all flex items-center gap-1 ${isTrash ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:text-red-600'}`;
+
+                // Mobile Btn States
+                if(window.innerWidth < 768) {
+                    const setM = (id, on) => document.getElementById(id).className = `p-2 rounded-lg ${on ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`;
+                    setM('btn-view-list-m', isList);
+                    setM('btn-view-grid-m', isGrid);
+                    document.getElementById('btn-view-trash-m').className = `p-2 rounded-lg relative ${isTrash ? 'bg-red-100 text-red-600' : 'text-slate-500'}`;
+                }
+
+                // Badges
+                const badge = isTrash ? `${this.data.deleted.length} lixeira` : `${list.length} itens`;
+                document.getElementById('item-count-badge').textContent = badge;
+                const trashD = document.getElementById('trash-count-badge-d');
+                if(trashD) {
+                    trashD.textContent = this.data.deleted.length;
+                    trashD.classList.toggle('hidden', this.data.deleted.length === 0);
+                }
+
+                // Items
+                const container = document.getElementById('items-container');
+                container.innerHTML = '';
+
+                if (list.length === 0) {
+                    container.innerHTML = `<div class="text-center py-20 text-slate-400">Nada encontrado.</div>`;
+                } else {
+                    let html = '';
+                    if (isTrash) {
+                        html = `<div class="bg-white rounded-xl shadow-sm divide-y divide-slate-100 border border-slate-200">${list.map(i => this.templates.trashRow(i)).join('')}</div>`;
+                    } else if (isGrid) {
+                        html = `<div class="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">${list.map(i => this.templates.card(i)).join('')}</div>`;
+                    } else {
+                        html = `<div class="space-y-3">${list.map(i => this.templates.row(i)).join('')}</div>`;
+                    }
+                    container.innerHTML = html;
+                }
+
+                if (!isTrash) this.updateTagOptions();
+                lucide.createIcons();
+            },
+
+            templates: {
+                row(i) {
+                    const date = new Date(i.createdAt).toLocaleDateString('pt-BR');
+                    const tags = i.tags.map(t=>`<span class="bg-indigo-50 text-indigo-700 px-2 rounded text-xs font-bold cursor-pointer" onclick="event.stopPropagation();App.selectTag('${t}')">#${t}</span>`).join(' ');
+                    const img = i.imageUrl ? `<div class="w-20 h-20 bg-slate-100 rounded-lg bg-cover bg-center shrink-0 hidden sm:block" style="background-image:url('${i.imageUrl}')"></div>` : '';
+                    let links = '';
+                    if(i.linkUrl) links+=`<a href="${i.linkUrl}" target="_blank" class="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="globe" width="18"></i></a>`;
+                    if(i.localPath) links+=`<a href="file:///${i.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" class="text-amber-500 hover:bg-amber-50 p-2 rounded"><i data-lucide="hard-drive" width="18"></i></a>`;
+                    
+                    return `<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4 hover:shadow-md transition-shadow">${img}<div class="flex-1 min-w-0"><div class="flex justify-between items-start"><h3 class="font-bold text-slate-900 line-clamp-1">${i.name}</h3><div class="flex items-center gap-1">${links}<div class="w-px h-4 bg-slate-200 mx-1"></div><button onclick="App.bumpItem('${i.id}')" class="p-2 text-slate-400 hover:text-green-600"><i data-lucide="arrow-up" width="18"></i></button><button onclick="App.prepareEdit('${i.id}')" class="p-2 text-slate-400 hover:text-indigo-600"><i data-lucide="edit-2" width="18"></i></button><button onclick="App.askDelete('${i.id}')" class="p-2 text-slate-400 hover:text-red-600"><i data-lucide="trash-2" width="18"></i></button></div></div><div class="flex flex-wrap gap-2 text-xs text-slate-400 my-1 items-center"><i data-lucide="calendar" width="12"></i> ${date} ${tags}</div><p class="text-sm text-slate-600 line-clamp-2">${i.description || ''}</p></div></div>`;
+                },
+                card(i) {
+                    const links = [];
+                    if(i.linkUrl) links.push(`<a href="${i.linkUrl}" target="_blank" onclick="event.stopPropagation()" class="bg-white p-2 rounded-full shadow text-blue-600"><i data-lucide="globe" width="16"></i></a>`);
+                    if(i.localPath) links.push(`<a href="file:///${i.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" onclick="event.stopPropagation()" class="bg-white p-2 rounded-full shadow text-amber-600"><i data-lucide="hard-drive" width="16"></i></a>`);
+                    const imgStyle = i.imageUrl ? `background-image:url('${i.imageUrl}')` : '';
+                    const noImgClass = !i.imageUrl ? 'bg-slate-100 flex items-center justify-center' : 'bg-cover bg-center';
+                    const noImgContent = !i.imageUrl ? '<i data-lucide="image-off" class="text-slate-300" width="32"></i>' : '';
+                    return `<div class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-lg transition-all"><div class="relative aspect-video ${noImgClass}" style="${imgStyle}">${noImgContent}<div class="absolute top-2 right-2 flex flex-col gap-2">${links.join('')}</div></div><div class="p-3 flex-1 flex flex-col"><h3 class="font-bold text-sm text-slate-900 line-clamp-2 mb-2">${i.name}</h3><div class="mt-auto flex flex-wrap gap-1">${i.tags.slice(0,3).map(t=>`<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#${t}</span>`).join('')}</div></div></div>`;
+                },
+                trashRow(i) {
+                    return `<div class="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors"><span class="font-medium text-slate-500 line-through decoration-slate-300">${i.name}</span><div class="flex gap-2"><button onclick="App.restoreItem('${i.id}')" class="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"><i data-lucide="rotate-ccw" width="16"></i></button><button onclick="App.askPermanentDelete('${i.id}')" class="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><i data-lucide="x" width="16"></i></button></div></div>`;
+                }
             }
         };
 
