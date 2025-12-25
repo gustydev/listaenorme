@@ -171,9 +171,9 @@
                 <div><label class="text-xs font-bold uppercase text-slate-500">Tags</label><input id="edit-tags" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="tag1, tag2"></div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label class="text-xs font-bold uppercase text-slate-500">Imagem URL</label><input id="edit-image" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" onchange="App.previewImage(this.value)"></div>
-                    <div><label class="text-xs font-bold uppercase text-slate-500">Link Web</label><input id="edit-link" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                    <div><label class="text-xs font-bold uppercase text-slate-500">Link Web</label><input id="edit-link" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="google.com"></div>
                 </div>
-                <div><label class="text-xs font-bold uppercase text-slate-500">Caminho Local</label><input id="edit-local-path" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="text-xs font-bold uppercase text-slate-500">Caminho Local</label><input id="edit-local-path" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="C:\Users\Eu\..."></div>
                 <div id="image-preview-container" class="hidden h-32 bg-slate-100 rounded-lg overflow-hidden"><img id="image-preview" class="w-full h-full object-cover"></div>
                 <div><label class="text-xs font-bold uppercase text-slate-500">Descrição</label><textarea id="edit-desc" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-24"></textarea></div>
                 <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">Salvar</button>
@@ -199,6 +199,7 @@
         const App = {
             data: { active: [], deleted: [] },
             state: { viewMode: 'list', filterTag: '', searchTerm: '', sortBy: 'dateDesc' },
+            currentRandomItem: null,
 
             // --- Inicialização ---
             init() {
@@ -423,9 +424,34 @@
             },
 
             // --- CRUD ---
+            prepareEdit(id) {
+                const item = this.data.active.find(i => i.id === id);
+                if (!item) return;
+                document.getElementById('edit-id').value = item.id;
+                document.getElementById('edit-name').value = item.name;
+                document.getElementById('edit-tags').value = item.tags.join(', ');
+                document.getElementById('edit-image').value = item.imageUrl || '';
+                document.getElementById('edit-link').value = item.linkUrl || '';
+                document.getElementById('edit-local-path').value = item.localPath || '';
+                document.getElementById('edit-desc').value = item.description || '';
+                document.getElementById('modal-edit-title').innerText = 'Editar Item';
+                this.previewImage(item.imageUrl || '');
+                this.openModal('edit');
+            },
+
             saveItem(e) {
                 if (e) e.preventDefault();
-                const id = document.getElementById('edit-id').value || crypto.randomUUID();
+                const idInput = document.getElementById('edit-id').value;
+                const isNew = !idInput;
+                const id = idInput || crypto.randomUUID();
+                
+                // Preserva data de criação se for edição
+                let createdAt = Date.now();
+                if (!isNew) {
+                    const existing = this.data.active.find(i => i.id === id);
+                    if (existing) createdAt = existing.createdAt;
+                }
+
                 const item = {
                     id: id,
                     name: document.getElementById('edit-name').value,
@@ -434,7 +460,7 @@
                     linkUrl: document.getElementById('edit-link').value.trim(),
                     localPath: document.getElementById('edit-local-path').value.replace(/^"|"$/g, '').trim(),
                     description: document.getElementById('edit-desc').value,
-                    createdAt: Date.now(),
+                    createdAt: createdAt,
                     is_deleted: false
                 };
 
@@ -511,6 +537,8 @@
                 if (!list.length) { this.showToast('Lista vazia', 'error'); return; }
                 const winner = list[Math.floor(Math.random() * list.length)];
                 
+                this.currentRandomItem = winner; // Save for copy logic
+
                 document.getElementById('random-winner-name').textContent = winner.name;
                 document.getElementById('random-winner-desc').textContent = winner.description || 'Sem descrição';
                 
@@ -523,11 +551,39 @@
 
                 const actsC = document.getElementById('random-winner-actions');
                 actsC.innerHTML = '';
-                if(winner.linkUrl) actsC.innerHTML += `<a href="${winner.linkUrl}" target="_blank" class="block bg-indigo-50 text-indigo-700 p-2 rounded text-center font-bold mb-2">Abrir Web</a>`;
-                if(winner.localPath) actsC.innerHTML += `<a href="file:///${winner.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" class="block bg-amber-50 text-amber-700 p-2 rounded text-center font-bold">Abrir Local</a>`;
+                
+                if(winner.linkUrl) {
+                    const url = this.getFormattedUrl('web', winner.linkUrl);
+                    actsC.innerHTML += `<a href="${url}" target="_blank" class="block bg-indigo-50 text-indigo-700 p-2 rounded text-center font-bold mb-2">Abrir Web</a>`;
+                }
+                
+                if(winner.localPath) {
+                    // Changed to Copy Button
+                    actsC.innerHTML += `<button onclick="App.copyRandomItemPath()" class="block w-full bg-amber-50 text-amber-700 p-2 rounded text-center font-bold">Copiar Caminho Local</button>`;
+                }
 
                 this.openModal('random');
                 lucide.createIcons();
+            },
+
+            // --- Copy Path Logic ---
+            copyItemPath(id) {
+                const item = this.data.active.find(i => i.id === id) || this.data.deleted.find(i => i.id === id);
+                if (item && item.localPath) {
+                    const path = item.localPath.replace(/^"|"$/g, '').trim();
+                    navigator.clipboard.writeText(path)
+                        .then(() => this.showToast('Caminho copiado!'))
+                        .catch(() => this.showToast('Erro ao copiar', 'error'));
+                }
+            },
+
+            copyRandomItemPath() {
+                if (this.currentRandomItem && this.currentRandomItem.localPath) {
+                    const path = this.currentRandomItem.localPath.replace(/^"|"$/g, '').trim();
+                    navigator.clipboard.writeText(path)
+                        .then(() => this.showToast('Caminho copiado!'))
+                        .catch(() => this.showToast('Erro ao copiar', 'error'));
+                }
             },
 
             // --- UI Core ---
@@ -552,6 +608,18 @@
                 el.innerText = msg;
                 document.getElementById('toast-container').appendChild(el);
                 setTimeout(()=>el.remove(), 3000);
+            },
+            
+            // Templates, Helpers
+            getFormattedUrl(type, value) { 
+                if(!value) return ''; 
+                if(type==='local') return value.replace(/^"|"$/g,'').trim().replace(/\\/g,'/'); 
+                if(type === 'web') {
+                    if (!/^https?:\/\//i.test(value)) {
+                        return 'https://' + value;
+                    }
+                }
+                return value; 
             },
             
             // Export
@@ -696,19 +764,54 @@
                     const tags = i.tags.map(t=>`<span class="bg-indigo-50 text-indigo-700 px-2 rounded text-xs font-bold cursor-pointer" onclick="event.stopPropagation();App.selectTag('${t}')">#${t}</span>`).join(' ');
                     const img = i.imageUrl ? `<div class="w-20 h-20 bg-slate-100 rounded-lg bg-cover bg-center shrink-0 hidden sm:block" style="background-image:url('${i.imageUrl}')"></div>` : '';
                     let links = '';
-                    if(i.linkUrl) links+=`<a href="${i.linkUrl}" target="_blank" class="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="globe" width="18"></i></a>`;
-                    if(i.localPath) links+=`<a href="file:///${i.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" class="text-amber-500 hover:bg-amber-50 p-2 rounded"><i data-lucide="hard-drive" width="18"></i></a>`;
+                    if(i.linkUrl) {
+                        const url = App.getFormattedUrl('web', i.linkUrl);
+                        links+=`<a href="${url}" target="_blank" class="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="globe" width="18"></i></a>`;
+                    }
+                    if(i.localPath) {
+                        // CHANGED: Button to copy path
+                        links+=`<button onclick="event.stopPropagation();App.copyItemPath('${i.id}')" class="text-amber-500 hover:bg-amber-50 p-2 rounded" title="Copiar Caminho"><i data-lucide="copy" width="18"></i></button>`;
+                    }
                     
                     return `<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4 hover:shadow-md transition-shadow">${img}<div class="flex-1 min-w-0"><div class="flex justify-between items-start"><h3 class="font-bold text-slate-900 line-clamp-1">${i.name}</h3><div class="flex items-center gap-1">${links}<div class="w-px h-4 bg-slate-200 mx-1"></div><button onclick="App.bumpItem('${i.id}')" class="p-2 text-slate-400 hover:text-green-600"><i data-lucide="arrow-up" width="18"></i></button><button onclick="App.prepareEdit('${i.id}')" class="p-2 text-slate-400 hover:text-indigo-600"><i data-lucide="edit-2" width="18"></i></button><button onclick="App.askDelete('${i.id}')" class="p-2 text-slate-400 hover:text-red-600"><i data-lucide="trash-2" width="18"></i></button></div></div><div class="flex flex-wrap gap-2 text-xs text-slate-400 my-1 items-center"><i data-lucide="calendar" width="12"></i> ${date} ${tags}</div><p class="text-sm text-slate-600 line-clamp-2">${i.description || ''}</p></div></div>`;
                 },
                 card(i) {
                     const links = [];
-                    if(i.linkUrl) links.push(`<a href="${i.linkUrl}" target="_blank" onclick="event.stopPropagation()" class="bg-white p-2 rounded-full shadow text-blue-600"><i data-lucide="globe" width="16"></i></a>`);
-                    if(i.localPath) links.push(`<a href="file:///${i.localPath.replace(/^"|"$/g,'').replace(/\\/g,'/')}" target="_blank" onclick="event.stopPropagation()" class="bg-white p-2 rounded-full shadow text-amber-600"><i data-lucide="hard-drive" width="16"></i></a>`);
-                    const imgStyle = i.imageUrl ? `background-image:url('${i.imageUrl}')` : '';
-                    const noImgClass = !i.imageUrl ? 'bg-slate-100 flex items-center justify-center' : 'bg-cover bg-center';
-                    const noImgContent = !i.imageUrl ? '<i data-lucide="image-off" class="text-slate-300" width="32"></i>' : '';
-                    return `<div class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-lg transition-all"><div class="relative aspect-video ${noImgClass}" style="${imgStyle}">${noImgContent}<div class="absolute top-2 right-2 flex flex-col gap-2">${links.join('')}</div></div><div class="p-3 flex-1 flex flex-col"><h3 class="font-bold text-sm text-slate-900 line-clamp-2 mb-2">${i.name}</h3><div class="mt-auto flex flex-wrap gap-1">${i.tags.slice(0,3).map(t=>`<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#${t}</span>`).join('')}</div></div></div>`;
+                    if(i.linkUrl) {
+                        const url = App.getFormattedUrl('web', i.linkUrl);
+                        links.push(`<a href="${url}" target="_blank" onclick="event.stopPropagation()" class="bg-white p-2 rounded-full shadow text-blue-600"><i data-lucide="globe" width="16"></i></a>`);
+                    }
+                    if(i.localPath) {
+                        // CHANGED: Button to copy path
+                        links.push(`<button onclick="event.stopPropagation();App.copyItemPath('${i.id}')" class="bg-white p-2 rounded-full shadow text-amber-600" title="Copiar Caminho"><i data-lucide="copy" width="16"></i></button>`);
+                    }
+                    
+                    // FIXED: Minimalist mode if no image
+                    if (!i.imageUrl) {
+                        return `<div class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-lg transition-all p-4 relative">
+                            <div class="absolute top-2 right-2 flex flex-col gap-2 z-10">
+                                ${links.join('').replace(/bg-white/g, 'bg-slate-100')}
+                            </div>
+                            <h3 class="font-bold text-sm text-slate-900 line-clamp-4 mb-2 pr-8">${i.name}</h3>
+                            <div class="mt-auto flex flex-wrap gap-1">
+                                ${i.tags.slice(0,3).map(t=>`<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#${t}</span>`).join('')}
+                            </div>
+                        </div>`;
+                    }
+
+                    // Standard Image Mode
+                    const imgStyle = `background-image:url('${i.imageUrl}')`;
+                    return `<div class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-lg transition-all">
+                        <div class="relative aspect-video bg-cover bg-center" style="${imgStyle}">
+                            <div class="absolute top-2 right-2 flex flex-col gap-2">${links.join('')}</div>
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col">
+                            <h3 class="font-bold text-sm text-slate-900 line-clamp-2 mb-2">${i.name}</h3>
+                            <div class="mt-auto flex flex-wrap gap-1">
+                                ${i.tags.slice(0,3).map(t=>`<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#${t}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>`;
                 },
                 trashRow(i) {
                     return `<div class="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors"><span class="font-medium text-slate-500 line-through decoration-slate-300">${i.name}</span><div class="flex gap-2"><button onclick="App.restoreItem('${i.id}')" class="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"><i data-lucide="rotate-ccw" width="16"></i></button><button onclick="App.askPermanentDelete('${i.id}')" class="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><i data-lucide="x" width="16"></i></button></div></div>`;
